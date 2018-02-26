@@ -3,11 +3,14 @@
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
-from time import sleep
+from time import sleep, time
 import csv
 import hashlib
 from datetime import datetime 
-import time
+from smtplib import SMTP
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEText import MIMEText
+from ConfigParser import SafeConfigParser
 
 
 
@@ -20,6 +23,10 @@ pE = '//*[@id="Item_Password"]'
 bE = '/html/body/div[1]/div/div[2]/div/div/form/div[2]/button'
 fN = 'items.csv'
 
+CFG = SafeConfigParser()
+config = 'user.conf'
+
+
 def login():
 	driver = webdriver.Firefox()
 	wait = WebDriverWait(driver, 10)
@@ -30,6 +37,30 @@ def login():
 	driver.find_element_by_xpath(bE).click()
 	sleep(3)
 	return driver
+
+
+def send_mail(msg_txt="\nItem price was changed!!!\n"):
+	CFG.read(config)
+	eUser = CFG.get('email', 'user')
+	ePassword = CFG.get('email', 'password')
+	sender = CFG.get('email', 'sender')
+	subject = CFG.get('email', 'subject')
+	recipient = CFG.get('email', 'recipients')
+	msg = MIMEMultipart()
+	msg['From'] = sender
+	msg['To'] = recipient
+	msg['Subject'] = subject
+	msg.attach(MIMEText(msg_txt.encode('utf-8'),'plain'))
+	try:
+		server = SMTP('smtp.gmail.com:587')
+		server.starttls()
+		server.login(eUser, ePassword)
+		server.sendmail(sender, recipient, msg.as_string())
+		print '[+] Email successfully sent'
+	except:
+		print "[-] Error sending email"
+	finally:
+		server.quit()
 
 
 def main():
@@ -59,11 +90,10 @@ def get_id(item):
 
 
 def write_file(item):
-	t = time.time()
 	#time = datetime.strftime(datetime.now(), "%d/%m %H:%M")
 	with open(fN,'ab') as f:
 		writer = csv.writer(f, delimiter=';')
-		writer.writerow([item['id'], t, item['initialPrice'], item['discount'], item['salesPrice']])
+		writer.writerow([item['id'], time(), item['initialPrice'], item['discount'], item['salesPrice']])
 
 
 def read_file():

@@ -11,6 +11,8 @@ from smtplib import SMTP
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEText import MIMEText
 from ConfigParser import SafeConfigParser
+from os.path import exists
+import pandas as pd
 
 
 
@@ -30,7 +32,7 @@ config = 'user.conf'
 def login():
 	driver = webdriver.Firefox()
 	wait = WebDriverWait(driver, 10)
-	driver.maximize_window()
+	#driver.maximize_window()
 	driver.get(url)
 	driver.find_element_by_xpath(uE).send_keys(user)
 	driver.find_element_by_xpath(pE).send_keys(password)
@@ -70,16 +72,21 @@ def main():
 	soup = BeautifulSoup(html, "html.parser")
 	order_list = soup.find('tbody', {'class': 'basket-list-body'})
 	items = order_list.find_all('tr', {'class': 'outerRow'})
-	#print order_list.prettify()
-	item_id = 0
 	for item in items:
 		d = dict()
 		d['title'] = item.find('a', {'class': 'j-product-popup image-link'}).get('title').strip()
-		d['salesPrice'] = item.find('td',{'class': 'basketTableSum'}).text.strip()
-		d['discount'] = item.find('span', {'class': 'sale'}).text.strip()
-		d['initialPrice'] = item.find('del', {'class': 'price-wo-sale'}).text.strip()
+		d['salesPrice'] = float(item.find('td',{'class': 'basketTableSum'}).text.strip().replace(' ',''))
+		if item.find('span', {'class': 'sale'}):
+			d['discount'] = float(item.find('span', {'class': 'sale'}).text.strip().replace('%','').replace('-',''))
+		else:
+			d['discount'] = 0
+		if item.find('del', {'class': 'price-wo-sale'}):
+			d['initialPrice'] = float(item.find('del', {'class': 'price-wo-sale'}).text.strip().replace(' ',''))
+		else:
+			d['initialPrice'] = d['salesPrice']
 		d['id'] = get_id(d['title'])
 		rez.append(d)
+	drv.close()
 	return rez
 
 
@@ -90,37 +97,50 @@ def get_id(item):
 
 
 def write_file(item):
-	#time = datetime.strftime(datetime.now(), "%d/%m %H:%M")
+	#time = datetime.strftime(datetime.now(), "%d/%m %H:%M")	
+	if not exists(fN):
+		with open(fN,'wb') as f:
+			writer = csv.writer(f)
+			headers = ['id', 'time', 'initialPrice', 'discount', 'salesPrice']
+			writer.writerow(headers)
 	with open(fN,'ab') as f:
-		writer = csv.writer(f, delimiter=';')
+		writer = csv.writer(f)
 		writer.writerow([item['id'], time(), item['initialPrice'], item['discount'], item['salesPrice']])
 
 
-def read_file():
-	with open(fN, 'r') as f:
-		reader = csv.reader(f, delimiter=';')
-		d = dict()
-		for row in reader:
-			item_id = str(row[0])
-			if item_id in d:
-				d[item_id].append(float(row[4]))
-			else:
-				d[item_id] = [float(row[4])]
-	return d
-
-
 def get_min_price(item_id):
-	d = read_file()
-	l = d[item_id]
-	return min(l)
+	df = pd.read_csv(fN)
+	df_new = df.loc[df['id'] == long(item_id)]
+	return float(df_new['salesPrice'].min())
+
+
+def get_max_discount(item_id):
+	df = pd.read_csv(fN)
+	df_new = df.loc[df['id'] == long(item_id)]
+	return float(df_new['discount'].max())
+
+
 
 
 if __name__ == '__main__':
 	basket = main()
+	if not exists(fN):
+		for item in basket:
+			write_file(item)
 	for item in basket:
-		write_file(item)
-	iid = '32719242'
-	print get_min_price(iid)
+		item_min_price = get_min_price(item['id'])
+		if item['salesPrice'] < item_min_price:
+			write_file(item)
+			msg_txt = '%s has new minimum price: %s' %(item['title'], item['salesPrice'] )
+			send_mail(msg_txt)
+			print msg_txt
+
+
+	
+	
+
+
+
 
 
 

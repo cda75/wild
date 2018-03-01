@@ -87,7 +87,7 @@ def main():
 			d['initialPrice'] = d['salesPrice']
 		d['id'] = get_id(d['title'])
 		rez.append(d)
-	drv.close()
+	#drv.close()
 	return rez
 
 

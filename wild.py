@@ -16,8 +16,6 @@ import pandas as pd
 
 
 
-user = "dchestnov@mail.ru"
-password = "Merlin75"
 basket_url = "https://lk.wildberries.ru/basket"
 url = "https://security.wildberries.ru/login?returnUrl=https://lk.wildberries.ru/basket"
 uE = '//*[@id="Item_Login"]'
@@ -32,6 +30,9 @@ config = 'user.conf'
 def login():
 	driver = webdriver.Firefox()
 	wait = WebDriverWait(driver, 10)
+	CFG.read(config)
+	user = CFG.get('wild', 'user')
+	password = CFG.get('wild', 'password')
 	#driver.maximize_window()
 	driver.get(url)
 	driver.find_element_by_xpath(uE).send_keys(user)
